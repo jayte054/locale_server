@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    app_name: str = "DelPosh App"
-    database_url: str = 'sqlite:///delposh_workouts_app.db'
+    app_name: str = "Locale E-commerce App"
+    database_url: str = 'sqlite:///locale_app.db'
 
     class Config:
         env_file = '.env'

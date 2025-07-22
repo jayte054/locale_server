@@ -5,7 +5,9 @@ from enum import Enum as PyEnum
 
 @dataclass
 class CreateUserRequest(BaseModel):
-    name: str
+    first_name: str
+    last_name: str
+    email: str
     phone_number: str
     password: str
 
@@ -22,7 +24,9 @@ class UserStatus(PyEnum):
 
 
 class UserResponse(BaseModel):
-    name: str
+    first_name: str
+    last_name: str
+    email: str
     phone_number: str
     hashed_password: str
     role: UserRole

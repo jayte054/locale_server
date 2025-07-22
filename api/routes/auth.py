@@ -20,3 +20,8 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 )
 def register_user(user_data: CreateUserRequest, auth_service: AuthService = Depends(AuthService)):
     return auth_service.create_user(user_data)
+
+@router.post(
+    '/sign_in',
+    response_model=
+)
