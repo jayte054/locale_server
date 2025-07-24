@@ -1,22 +1,21 @@
+import uuid
 from datetime import timedelta, datetime, timezone
 from typing import Annotated
 
 from services.authService.model.userModel import User
 from services.authService.model.blacklistModel import TokenBlacklist
 from deps import bcrypt_context, db_dependency
-from services.authService.utils import CreateUserRequest, UserRole, UserStatus, UserResponse
+from services.authService.utils import CreateUserRequest, LogoutResponse, UserRole, UserStatus, UserResponse, SignInResponse, RefreshResponse, LogoutResponse, UpdateUserInterface
 from dataclasses import astuple
 from jose import jwt, JWTError
-
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi import Body, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from dotenv import load_dotenv
-import os
+from config.config import settings
 
-load_dotenv()
 
-SECRET_KEY = os.getenv('AUTH_SECRET_KEY')
-ALGORITHM = os.getenv('AUTH_ALGORITHM')
+SECRET_KEY = settings.auth_secret_key
+ALGORITHM = settings.auth_algorithm
 
 
 class AuthService:
@@ -60,14 +59,24 @@ class AuthService:
                 created_at=datetime.now(),
                 role=UserRole.User,
                 user_active=True,
-                user_status=UserStatus.NOT_PAID,
+                user_status=UserStatus.New_User,
                 user_metadata={}
             )
 
             self.db.add(user)
             self.db.commit()
             self.db.refresh(user)
-            return user
+            return UserResponse(
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                phone_number=phone_number,
+                created_at=datetime.now(),
+                role=UserRole.User,
+                user_active=True,
+                user_status=UserStatus.New_User,
+                user_metadata={}
+            )
 
         except HTTPException:
             raise
@@ -127,30 +136,45 @@ class AuthService:
                 detail=f'failed to create refresh token: {str(e)}'
             )
 
-    def sign_in(self, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    def sign_in(self, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> SignInResponse:
         try:
-            user = self.authenticate_user(form_data.name, form_data.password)
+            user = self.authenticate_user(form_data.username, form_data.password)
             token = self.create_access_token(
                 user.email, user.id, timedelta(minutes=40))
             refresh_token = self.create_refresh_token(
                 user.id, timedelta(days=3))
-
-            return {
-                'user': {
-                    'email': user.email,
-                    'name': f'{user.first_name} {user.last_name}',
-                    'id': user.id,
-                    'contact': user.phone_number,
-                    'role': user.role,
-                    'status': user.user_status,
-                    'metadata': user.user_metadata,
+            
+            current_metadata = user.user_metadata or {}
+            update_data = {
+                "user_metadata": {
+                    **current_metadata,
+                    "last_sign_in": datetime.now().isoformat()
                 },
-                'access_token': token,
-                'refresh_token': refresh_token,
-                'token_type': 'bearer',
-                'access_token_expires_in': 2400,
-                'refresh_token_expires_in': 14400
+                "user_active": True
             }
+
+            if user.user_status == UserStatus.New_User:
+                update_data['user_status']= UserStatus.Active_User
+
+                
+            self.signin_update_user(user, UpdateUserInterface(**update_data))
+
+            return SignInResponse(
+                user={
+                    "email": user.email,
+                    "name": f'{user.first_name} {user.last_name}',
+                    "id": user.id,
+                    "contact": user.phone_number,
+                    "role": user.role,
+                    "status": user.user_status,
+                    "metadata": user.user_metadata,
+                },
+                access_token=token,
+                refresh_token=refresh_token,
+                token_type='bearer',
+                access_token_expires_in=2400,
+                refresh_token_expires_in=14400
+            )
         except HTTPException:
             raise
         except Exception as e:
@@ -159,7 +183,7 @@ class AuthService:
                 detail=f'authentication failed: {str(e)}'
             )
 
-    def use_refresh_token(self, refresh_token: str = Body(..., embed=True)):
+    def use_refresh_token(self, refresh_token: str = Body(..., embed=True)) -> RefreshResponse:
         try:
             if self.is_token_revoked(refresh_token):
                 raise HTTPException(
@@ -192,10 +216,10 @@ class AuthService:
             refresh_token = self.create_refresh_token(
                 user_id, timedelta(days=3))
 
-            return {
-                access_token,
-                refresh_token
-            }
+            return RefreshResponse(
+                access_token=access_token,
+                refresh_token=refresh_token,
+            )
         except JWTError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -241,17 +265,43 @@ class AuthService:
         except JWTError:
             return True
 
-    def logout(self, token: str):
+    def logout(self, refresh_token: str) -> LogoutResponse:
         try:
-            self.revoke_token(token)
+            self.revoke_token(refresh_token)
 
-            return {
-                'status': 'success',
-                'message': 'successfully logged out',
-                'timestamp': datetime.utcnow().isoformat()
-            }
+            return LogoutResponse(
+                status='success',
+                message='successfully logged out',
+                timestamp=datetime.utcnow().isoformat()
+            )
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f'logout failed: {str(e)}'
             )
+        
+    def signin_update_user(self, user: User, input: UpdateUserInterface):
+        try:
+            field_updates = {
+                'user_status': input.user_status,
+                'user_active': input.user_active,
+                'user_metadata': input.user_metadata,
+                'phone_number': input.phone_number,
+                'email': input.email,
+            }
+
+            for field, value in field_updates.items():
+                if value is not None:
+                    setattr(user, field, value)
+
+            self.db.commit()
+            self.db.refresh(user)
+
+            return {"ok": True}
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f'Database error: {str(e)}'
+            )
+

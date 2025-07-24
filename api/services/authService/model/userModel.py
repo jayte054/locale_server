@@ -18,7 +18,7 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.Guest, index=True)
     user_active = Column(Boolean, index=True, nullable=False)
     user_status = Column(
-        Enum(UserStatus), default=UserStatus.NOT_PAID, index=True, nullable=False)
+        Enum(UserStatus), default=UserStatus.Inactive_user, index=True, nullable=False)
     user_metadata = Column(JSON)
 
     def __repr__(self):
