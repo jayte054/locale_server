@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from routes.schema.schema import CreateUserSchema
 from services.authService.utils import UserResponse, CreateUserRequest, RefreshResponse, LogoutResponse
 from services.authService.authService import AuthService, SignInResponse
@@ -55,5 +55,5 @@ def use_refresh_token(refresh_token: str, auth_service: AuthService = Depends(Au
         408: {'description': "Bad Request"}
     }
 )
-def logout(refresh_token: str, authService: AuthService = Depends(AuthService)):
+def logout(refresh_token: Optional[str] = None, authService: AuthService = Depends(AuthService)):
     return authService.logout(refresh_token)

@@ -1,12 +1,33 @@
-from fastapi import FastAPI
-from config.database import Base, engine
+from contextlib import asynccontextmanager
+from config.database import Base, engine, SessionLocal
 from config.config import settings
+from deps import TokenCleanUpScheduler
 from routes.routers import router as api_router
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi import FastAPI
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage start up and shutdown events"""
+    #startup    
+    Base.metadata.create_all(bind=engine)
+    scheduler_db = SessionLocal()
+    scheduler = TokenCleanUpScheduler(scheduler_db)
+    scheduler.start()
+
+    app.state.scheduler = scheduler
+    app.state.scheduler_db = scheduler_db
+    yield
+
+    #shutdown
+    scheduler.shutdown()
+    scheduler_db.close()
+
+
 app = FastAPI(title=settings.app_name)
 
-Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,

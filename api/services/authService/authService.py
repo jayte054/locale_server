@@ -1,11 +1,21 @@
 import uuid
 from datetime import timedelta, datetime, timezone
-from typing import Annotated
+from typing import Annotated, Optional
+import logging
 
 from services.authService.model.userModel import User
 from services.authService.model.blacklistModel import TokenBlacklist
 from deps import bcrypt_context, db_dependency
-from services.authService.utils import CreateUserRequest, LogoutResponse, UserRole, UserStatus, UserResponse, SignInResponse, RefreshResponse, LogoutResponse, UpdateUserInterface
+from services.authService.utils import (
+    CreateUserRequest, 
+    LogoutResponse, 
+    UserRole, 
+    UserStatus, 
+    UserResponse, 
+    SignInResponse, 
+    RefreshResponse, 
+    UpdateUserInterface
+    )
 from dataclasses import astuple
 from jose import jwt, JWTError
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,6 +26,8 @@ from config.config import settings
 
 SECRET_KEY = settings.auth_secret_key
 ALGORITHM = settings.auth_algorithm
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -66,6 +78,8 @@ class AuthService:
             self.db.add(user)
             self.db.commit()
             self.db.refresh(user)
+
+            logger.info(f'user {user.first_name} created successfully')
             return UserResponse(
                 first_name=first_name,
                 last_name=last_name,
@@ -107,7 +121,13 @@ class AuthService:
 
     def create_access_token(self, email: str, user_id: str, expires_delta: timedelta):
         try:
-            encode = {'sub': email, 'id': user_id, 'jti': str(uuid.uuid4())}
+            encode = {
+                'sub': email, 
+                'id': user_id, 
+                'jti': str(uuid.uuid4()),
+                'token_type': 'access',
+                'iat': datetime.now(timezone.utc)
+                }
             expires_in = datetime.now(timezone.utc) + expires_delta
             encode.update({"exp": expires_in})
             return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -126,7 +146,7 @@ class AuthService:
                 'sub': 'refresh',
                 'id': user_id,
                 'exp': expires_in,
-                'toke_type': 'refresh'
+                'token_type': 'refresh'
             }
             token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
             return token
@@ -157,7 +177,7 @@ class AuthService:
                 update_data['user_status']= UserStatus.Active_User
 
                 
-            self.signin_update_user(user, UpdateUserInterface(**update_data))
+            self.update_user(user, UpdateUserInterface(**update_data))
 
             return SignInResponse(
                 user={
@@ -196,7 +216,7 @@ class AuthService:
                 SECRET_KEY,
                 algorithms=ALGORITHM
             )
-
+            
             if payload.get('token_type') != 'refresh':
                 raise HTTPException(
                     status_code=400,
@@ -213,12 +233,14 @@ class AuthService:
 
             access_token = self.create_access_token(
                 user.email, user.id, timedelta(minutes=40))
-            refresh_token = self.create_refresh_token(
+            new_refresh_token = self.create_refresh_token(
                 user_id, timedelta(days=3))
+            
+            self.revoke_token(refresh_token)
 
             return RefreshResponse(
-                access_token=access_token,
-                refresh_token=refresh_token,
+                access_token = access_token,
+                refresh_token = new_refresh_token,
             )
         except JWTError as e:
             raise HTTPException(
@@ -227,13 +249,14 @@ class AuthService:
             )
 
     def revoke_token(self, token: str) -> str:
+        print(token)
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
             if datetime.fromtimestamp(payload['exp']) < datetime.utcnow():
                 return
 
-            if self.revoke_token(token):
+            if self.is_token_revoked(token):
                 return 'token already revoked'
 
             blacklisted = TokenBlacklist(
@@ -265,9 +288,9 @@ class AuthService:
         except JWTError:
             return True
 
-    def logout(self, refresh_token: str) -> LogoutResponse:
+    def logout(self, refresh_token: Optional[str] = None) -> LogoutResponse:
         try:
-            self.revoke_token(refresh_token)
+            refresh_token and self.revoke_token(refresh_token)
 
             return LogoutResponse(
                 status='success',
@@ -280,7 +303,7 @@ class AuthService:
                 detail=f'logout failed: {str(e)}'
             )
         
-    def signin_update_user(self, user: User, input: UpdateUserInterface):
+    def update_user(self, user: User, input: UpdateUserInterface):
         try:
             field_updates = {
                 'user_status': input.user_status,
