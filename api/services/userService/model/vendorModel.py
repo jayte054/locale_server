@@ -1,5 +1,16 @@
 import uuid
-from sqlalchemy import Column, String, Integer, Enum, JSON, DateTime, ForeignKey
+from sqlalchemy import (
+    Column, 
+    String, 
+    Integer, 
+    Enum, 
+    JSON, 
+    DateTime, 
+    ForeignKey,
+    CheckConstraint,
+    func
+    )
+from sqlalchemy.orm import relationship
 
 from config.database import Base
 from services.userService.utils import VendorScale
@@ -29,13 +40,13 @@ class Vendor(Base):
         comment="full physical address"
         )
     vendor_contact = Column(
-        String(11), 
+        String(20), 
         nullable=False,
         comment="Primary vendor number"
         )
     vendor_email = Column(
         String(50),
-        nullable=False,
+        nullable=True,
         comment="Primary vendor email"
     )
     vendor_merchandise = Column(
@@ -48,6 +59,11 @@ class Vendor(Base):
         nullable=False,
         comment= "Record creation timestamp"
         )
+    updated_at = Column(
+        DateTime,
+        nullable=True,
+        comment="last modification timestamp"
+    )
     vendor_rating = Column(
         Integer, 
         nullable=False, 
@@ -62,9 +78,22 @@ class Vendor(Base):
         )
     vendor_metadata = Column(
         JSON,
+        nullable= False,
         comment="Extended properties and attributes"
         )
     user_id = Column(
-        String,
+        String(36),
         ForeignKey('users.id'),
         nullable=False)
+    user = relationship(
+        "User",
+        back_populates="vendors",
+    )
+
+    # Table Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "vendor_rating BETWEEN 1 and 5",
+            name="ck_vendor_rating_range"
+        ),
+    )

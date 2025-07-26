@@ -7,13 +7,18 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-from fastapi import Depends
-
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+from config.config import settings
 
 from config.database import SessionLocal
 from services.authService.model.blacklistModel import TokenBlacklist
 
 logger = logging.getLogger("TokenCleanupScheduler")
+
+SECRET_KEY = settings.auth_secret_key
+ALGORITHM = settings.auth_algorithm
 
 
 def get_db():
@@ -27,6 +32,30 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 bcrypt_context = CryptContext(
     schemes=['bcrypt'], deprecated='auto', bcrypt__rounds=12)
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/sign_in')
+oauth2_bearer_dependency = Annotated[str, Depends(oauth2_bearer)]
+
+async def get_current_user(token: oauth2_bearer_dependency):
+    try:
+        payload= jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get('sub')
+        user_id: str = payload.get('id')
+        if username is None or user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="could not authorize access"
+            )
+        return {
+            'username': username,
+            'id': user_id
+        }
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="unauthorized access"
+        )
+    
+auth_dependency = Annotated[dict, Depends(get_current_user)]
 
 
 class TokenCleanUpScheduler:

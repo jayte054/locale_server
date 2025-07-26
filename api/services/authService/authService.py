@@ -3,7 +3,7 @@ from datetime import timedelta, datetime, timezone
 from typing import Annotated, Optional
 import logging
 
-from services.authService.model.userModel import User
+from services.authService.model.authModel import User
 from services.authService.model.blacklistModel import TokenBlacklist
 from deps import bcrypt_context, db_dependency
 from services.authService.utils import (

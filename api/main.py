@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
 from config.database import Base, engine, SessionLocal
 from config.config import settings
+from services.authService.model.authModel import User
+from services.authService.model.blacklistModel import TokenBlacklist
+from services.userService.model.vendorModel import Vendor
 from deps import TokenCleanUpScheduler
 from routes.routers import router as api_router
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +29,7 @@ async def lifespan(app: FastAPI):
     scheduler_db.close()
 
 
-app = FastAPI(title=settings.app_name)
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 
 app.add_middleware(
