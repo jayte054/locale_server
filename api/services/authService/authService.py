@@ -5,6 +5,7 @@ import logging
 
 from services.authService.model.authModel import User
 from services.authService.model.blacklistModel import TokenBlacklist
+from services.emailService.emailService import EmailSender, EmailVerifier
 from deps import bcrypt_context, db_dependency
 from services.authService.utils import (
     CreateUserRequest, 
@@ -14,14 +15,17 @@ from services.authService.utils import (
     UserResponse, 
     SignInResponse, 
     RefreshResponse, 
-    UpdateUserInterface
+    UpdateUserInterface,
+    VerifyTokenResponse
     )
+from config.config import settings
+
 from dataclasses import astuple
 from jose import jwt, JWTError
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm.attributes import flag_modified
 from fastapi import Body, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from config.config import settings
 
 
 SECRET_KEY = settings.auth_secret_key
@@ -34,10 +38,20 @@ class AuthService:
     def __init__(self, db_session: db_dependency):
         self.db = db_session
 
-    def create_user(self, create_user_request: CreateUserRequest) -> UserResponse:
+    async def create_user(self, create_user_request: CreateUserRequest) -> UserResponse:
         first_name, last_name, email, phone_number, password = astuple(
             create_user_request)
+        
         try:
+            email_verifier = EmailVerifier()
+            email_sender = EmailSender()
+
+            if not await email_verifier.verify_email(email):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalide email address"
+                )
+            
             if self.db.query(User).filter(User.email == email).first():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -61,6 +75,8 @@ class AuthService:
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f'Missing required fields: {', '.join(missing_fields)}'
                 )
+            
+            verification_token = str(uuid.uuid4())
 
             user = User(
                 first_name=first_name,
@@ -70,26 +86,33 @@ class AuthService:
                 hashed_password=bcrypt_context.hash(password),
                 created_at=datetime.now(),
                 role=UserRole.User,
-                user_active=True,
+                user_active=False,
                 user_status=UserStatus.New_User,
-                user_metadata={}
+                email_validated=True,
+                user_metadata={
+                    'verification_token': verification_token,
+                    'verified': False
+                }
             )
+
+            # await email_sender.send_verification_email(email, verification_token)
 
             self.db.add(user)
             self.db.commit()
             self.db.refresh(user)
 
-            logger.info(f'user {user.first_name} created successfully')
+            logger.info('user %s created successfully', {user.first_name})
             return UserResponse(
-                first_name=first_name,
-                last_name=last_name,
-                email=email,
-                phone_number=phone_number,
-                created_at=datetime.now(),
-                role=UserRole.User,
-                user_active=True,
-                user_status=UserStatus.New_User,
-                user_metadata={}
+                first_name= user.first_name,
+                last_name= user.last_name,
+                email= user.email,
+                phone_number= user.phone_number,
+                created_at= user.created_at,
+                role=user.role,
+                user_active=user.user_active,
+                user_status=user.user_status,
+                email_validated= user.email_validated,
+                user_metadata= user.user_metadata
             )
 
         except HTTPException:
@@ -310,6 +333,7 @@ class AuthService:
                 'user_active': input.user_active,
                 'user_metadata': input.user_metadata,
                 'phone_number': input.phone_number,
+                'email_validated': input.email_validated,
                 'email': input.email,
             }
 
@@ -327,4 +351,43 @@ class AuthService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f'Database error: {str(e)}'
             )
+
+    def verify_user_token(self, token: str) -> VerifyTokenResponse:
+        try:
+            user = self.db.query(User).filter(User.user_metadata['verification_token'].as_string() == token).first()
+            print(user.user_metadata['verification_token'])
+            
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail= f'verification token {token} not found'
+                )
+            
+            if not isinstance(user.user_metadata, dict):
+                logger.error(f"user_metadata is not a dictionary for user {user.id}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Invalid user metadata format"
+                )
+            
+            user.user_metadata['verified'] = True
+            user.user_metadata.pop("verification_token", None)
+            flag_modified(user, "user_metadata")
+
+            self.db.commit()
+            self.db.refresh(user)
+            logger.info(f'user {user.id} verification successful')
+            return VerifyTokenResponse(
+                message= "User verified successfully"
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Unexpected error verifying token: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail='verification unsuccessful'
+            )
+
 

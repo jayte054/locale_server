@@ -34,6 +34,7 @@ class UserResponse(BaseModel):
     role: UserRole
     user_active: bool
     user_status: UserStatus
+    email_validated: bool
     user_metadata: dict = {}
 
     class Config:
@@ -70,4 +71,8 @@ class UpdateUserInterface(BaseModel):
     phone_number: Optional[str] = None
     user_active: Optional[bool] = None
     user_status: Optional[UserStatus] = None
+    email_validated: Optional[bool] = None
     user_metadata: Optional[dict] = None
+
+class VerifyTokenResponse(BaseModel):
+    message: str

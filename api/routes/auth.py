@@ -1,6 +1,12 @@
 from typing import Annotated, Optional
 from routes.schema.schema import CreateUserSchema
-from services.authService.utils import UserResponse, CreateUserRequest, RefreshResponse, LogoutResponse
+from services.authService.utils import (
+    UserResponse, 
+    CreateUserRequest, 
+    RefreshResponse, 
+    LogoutResponse, 
+    VerifyTokenResponse
+    )
 from services.authService.authService import AuthService, SignInResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -20,8 +26,8 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
         500: {"description=": "Internal server error"}
     }
 )
-def register_user(user_data: CreateUserRequest, auth_service: AuthService = Depends(AuthService)):
-    return auth_service.create_user(user_data)
+async def register_user(user_data: CreateUserRequest, auth_service: AuthService = Depends(AuthService)):
+    return await auth_service.create_user(user_data)
 
 @router.post(
     '/sign_in',
@@ -57,3 +63,16 @@ def use_refresh_token(refresh_token: str, auth_service: AuthService = Depends(Au
 )
 def logout(refresh_token: Optional[str] = None, authService: AuthService = Depends(AuthService)):
     return authService.logout(refresh_token)
+
+@router.put(
+    '/verify_token',
+    response_model= VerifyTokenResponse,
+    status_code= status.HTTP_200_OK,
+    responses={
+        400: {'description': "Bad Request"},
+        404: {"descripion": "Not found"},
+        501: {"description": 'Not implemented'}
+    }
+)
+def verify_user_token(token: str, authService: AuthService = Depends(AuthService)):
+    return authService.verify_user_token(token)

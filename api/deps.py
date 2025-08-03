@@ -47,7 +47,7 @@ async def get_current_user(token: oauth2_bearer_dependency):
             )
         return {
             'username': username,
-            'id': user_id
+            'id': user_id,
         }
     except JWTError:
         raise HTTPException(
@@ -89,7 +89,7 @@ class TokenCleanUpScheduler:
             )
         except Exception as e:
             logger.critical(
-                f'scheduler failed to start: {str(e)}'
+                'scheduler failed to start: %s', str(e)
             )
             raise
 
@@ -104,7 +104,6 @@ class TokenCleanUpScheduler:
                 while True:
                     deleted = db.query(TokenBlacklist)\
                         .filter(TokenBlacklist.expires < datetime.utcnow())\
-                        .limit(batch_size)\
                         .delete(synchronize_session=False)
 
                     if deleted == 0:
@@ -114,16 +113,13 @@ class TokenCleanUpScheduler:
                     db.commit()
 
                 logger.info(
-                    f"cleaned up {total_deleted} expired tokens"
+                    "cleaned up %s expred_tokens", total_deleted
                 )
             except Exception as e:
-                logger.error(
-                    f'Token clean up failed: {str(e)}',
-                    exc_info=True
-                )
+                logger.error("Token clean up failed: %s",str(e),exc_info=True)
                 db.rollback()
             except Exception as e:
-                logger.critical(f'unexpected error: {str(e)}', exc_info=True)
+                logger.critical('unexpected error: %s', str(e), exc_info=True)
             finally:
                 db.close()
 
@@ -133,5 +129,5 @@ class TokenCleanUpScheduler:
                 self.scheduler.shutdown(wait=True)
                 logger.info('Scheduler stopped gracefully')
         except Exception as e:
-            logger.error(f'Error during shutdown: {str(e)}', exc_info=True)
+            logger.error('Error during shutdown: %s', str(e), exc_info=True)
             raise

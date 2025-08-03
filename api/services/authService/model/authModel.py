@@ -65,6 +65,11 @@ class User(Base):
         index=True, 
         nullable=False
         )
+    email_validated = Column(
+        Boolean,
+        default=False,
+        nullable=True
+    )
     user_metadata = Column(JSON)
     vendors = relationship(
         "Vendor",
