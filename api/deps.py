@@ -14,6 +14,7 @@ from config.config import settings
 
 from config.database import SessionLocal
 from services.authService.model.blacklistModel import TokenBlacklist
+from services.authService.utils import UserRole
 
 logger = logging.getLogger("TokenCleanupScheduler")
 
@@ -40,6 +41,7 @@ async def get_current_user(token: oauth2_bearer_dependency):
         payload= jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get('sub')
         user_id: str = payload.get('id')
+        user_role: UserRole = payload.get('role')
         if username is None or user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -48,6 +50,7 @@ async def get_current_user(token: oauth2_bearer_dependency):
         return {
             'username': username,
             'id': user_id,
+            "role": user_role,
         }
     except JWTError:
         raise HTTPException(

@@ -142,11 +142,12 @@ class AuthService:
             )
         return user
 
-    def create_access_token(self, email: str, user_id: str, expires_delta: timedelta):
+    def create_access_token(self, email: str, user_id: str, role: UserRole, expires_delta: timedelta):
         try:
             encode = {
                 'sub': email, 
                 'id': user_id, 
+                'role': role,
                 'jti': str(uuid.uuid4()),
                 'token_type': 'access',
                 'iat': datetime.now(timezone.utc)
@@ -183,7 +184,7 @@ class AuthService:
         try:
             user = self.authenticate_user(form_data.username, form_data.password)
             token = self.create_access_token(
-                user.email, user.id, timedelta(minutes=40))
+                user.email, user.id, user.role, timedelta(minutes=40))
             refresh_token = self.create_refresh_token(
                 user.id, timedelta(days=3))
             
@@ -255,7 +256,7 @@ class AuthService:
                 )
 
             access_token = self.create_access_token(
-                user.email, user.id, timedelta(minutes=40))
+                user.email, user.id, user.role, timedelta(minutes=40))
             new_refresh_token = self.create_refresh_token(
                 user_id, timedelta(days=3))
             
@@ -355,7 +356,6 @@ class AuthService:
     def verify_user_token(self, token: str) -> VerifyTokenResponse:
         try:
             user = self.db.query(User).filter(User.user_metadata['verification_token'].as_string() == token).first()
-            print(user.user_metadata['verification_token'])
             
             if not user:
                 raise HTTPException(
@@ -364,7 +364,7 @@ class AuthService:
                 )
             
             if not isinstance(user.user_metadata, dict):
-                logger.error(f"user_metadata is not a dictionary for user {user.id}")
+                logger.error("user_metadata is not a dictionary for user %s", user.id)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Invalid user metadata format"
@@ -376,7 +376,7 @@ class AuthService:
 
             self.db.commit()
             self.db.refresh(user)
-            logger.info(f'user {user.id} verification successful')
+            logger.info('user %s verification successful', user.id)
             return VerifyTokenResponse(
                 message= "User verified successfully"
             )
@@ -384,10 +384,10 @@ class AuthService:
             raise
         except Exception as e:
             self.db.rollback()
-            logger.error(f"Unexpected error verifying token: {str(e)}")
+            logger.error("Unexpected error verifying token: %s", {str(e)})
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail='verification unsuccessful'
-            )
+            ) from e
 
 

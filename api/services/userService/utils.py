@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, List, Any
 from pydantic import (
     BaseModel, 
     Field, 
@@ -55,3 +55,15 @@ class CreateVendorResponse(BaseModel):
     vendor_metadata: dict = {}
     userId: str
 
+class VendorFilter(BaseModel):
+    search: Optional[str] = None
+    created_at: Optional[str] = None
+    skip: Optional[int] = None
+    take: Optional[int] = None
+
+class FetchVendorResponse(BaseModel):
+    data: List[Dict[str, Any]]
+    total: int
+    page: int
+    per_page: int
+    has_more: bool
