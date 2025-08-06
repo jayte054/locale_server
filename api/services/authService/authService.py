@@ -85,7 +85,7 @@ class AuthService:
                 phone_number=phone_number,
                 hashed_password=bcrypt_context.hash(password),
                 created_at=datetime.now(),
-                role=UserRole.User,
+                role=UserRole.User.value,
                 user_active=False,
                 user_status=UserStatus.New_User,
                 email_validated=True,
@@ -135,14 +135,10 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail='incorrect password'
             )
-        if not user.user_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail='user account is inactive'
-            )
+        
         return user
 
-    def create_access_token(self, email: str, user_id: str, role: UserRole, expires_delta: timedelta):
+    def create_access_token(self, email: str, user_id: str, role: str, expires_delta: timedelta):
         try:
             encode = {
                 'sub': email, 
@@ -161,7 +157,7 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f'token creation failed: {str(e)}'
-            )
+            ) from e
 
     def create_refresh_token(self, user_id: str, expires_delta=timedelta):
         try:
@@ -178,16 +174,15 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f'failed to create refresh token: {str(e)}'
-            )
+            ) from e
 
     def sign_in(self, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> SignInResponse:
         try:
             user = self.authenticate_user(form_data.username, form_data.password)
             token = self.create_access_token(
-                user.email, user.id, user.role, timedelta(minutes=40))
+                user.email, user.id, user.role.value, timedelta(minutes=40))
             refresh_token = self.create_refresh_token(
                 user.id, timedelta(days=3))
-            
             current_metadata = user.user_metadata or {}
             update_data = {
                 "user_metadata": {
@@ -273,7 +268,6 @@ class AuthService:
             )
 
     def revoke_token(self, token: str) -> str:
-        print(token)
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 

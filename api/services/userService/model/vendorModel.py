@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     CheckConstraint,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 
@@ -75,6 +76,18 @@ class Vendor(Base):
         index=True,
         nullable=False,
         comment="Business size classification"
+    )
+    is_active = Column(
+        Boolean,
+        nullable=True,
+        default=True,
+        comment="active or inactive status"
+    )
+    deleted = Column(
+        Boolean,
+        nullable=True,
+        default=False,
+        comment='delete a vendor'
     )
     vendor_metadata = Column(
         JSON,
