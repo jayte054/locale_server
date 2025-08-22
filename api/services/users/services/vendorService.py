@@ -6,7 +6,7 @@ import pandas as pd
 from io import StringIO, BytesIO
 
 from deps import db_dependency, auth_dependency
-from services.userService.utils import (
+from services.users.utils import (
     CreateVendorRequest,
     CreateVendorResponse,
     UpdateVendorInput,
@@ -15,7 +15,7 @@ from services.userService.utils import (
     VendorScale,
     VendorResponse,
 )
-from services.userService.model.vendorModel import Vendor
+from services.users.model.vendorModel import Vendor
 
 from pydantic import TypeAdapter
 from sqlalchemy import or_, func

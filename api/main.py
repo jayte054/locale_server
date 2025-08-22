@@ -3,7 +3,7 @@ from config.database import Base, engine, SessionLocal
 from config.config import settings
 from services.authService.model.authModel import User
 from services.authService.model.blacklistModel import TokenBlacklist
-from services.userService.model.vendorModel import Vendor
+from services.users.model.vendorModel import Vendor
 from deps import TokenCleanUpScheduler
 from routes.routers import router as api_router
 from fastapi.middleware.cors import CORSMiddleware

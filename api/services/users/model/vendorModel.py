@@ -13,7 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from config.database import Base
-from services.userService.utils import VendorScale
+from services.users.utils import VendorScale
 
 
 class Vendor(Base):
@@ -97,7 +97,8 @@ class Vendor(Base):
     user_id = Column(
         String(36),
         ForeignKey('users.id'),
-        nullable=False)
+        nullable=False
+    )
     user = relationship(
         "User",
         back_populates="vendors",

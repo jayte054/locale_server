@@ -50,7 +50,7 @@ class User(Base):
         nullable=True
         )
     role = Column(
-        Enum(UserRole), 
+        Enum(UserRole),
         default=UserRole.Guest, 
         index=True
         )
@@ -73,6 +73,12 @@ class User(Base):
     user_metadata = Column(JSON)
     vendors = relationship(
         "Vendor",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic"
+    )
+    buyers = relationship(
+        "Buyer",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="dynamic"

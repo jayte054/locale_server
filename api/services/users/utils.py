@@ -34,12 +34,36 @@ class CreateVendorRequest(BaseModel):
             raise ValueError("Title cannot be empty")
         return v.title()
     
+    @field_validator('vendor_location')
+    @classmethod
+    def validate_location(cls, v: str):
+        v = v.strip()
+        if not v:
+            raise ValueError('location cannot be empty')
+        return v.title()
+    
+    @field_validator('vendor_address')
+    @classmethod
+    def validate_address(cls, v: str):
+        v = v.strip()
+        if not v:
+            raise ValueError('vendor address cannot be empty')
+        return v.title()
+    
     @field_validator('vendor_contact')
     @classmethod
     def validate_contact(cls, v: str):
         if not any(char.isdigit() for char in v):
             raise ValueError("Contact should contain at least one digit")
         return v
+    
+    @field_validator('vendor_merchandise')
+    @classmethod
+    def validate_merchandise(cls, v: str):
+        v = v.strip()
+        if not v:
+            raise ValueError('merchandise cannot be empty')
+        return v.title()
 
 
 class CreateVendorResponse(BaseModel):
@@ -123,3 +147,97 @@ class VendorResponse(BaseModel):
     is_active: Any #convert to boolean when moving to staging
     deleted: Any #convert to boolean when moving to staging
     userId: str
+
+
+class CreateBuyerInput(BaseModel):
+    buyer_name: str
+    buyer_email: str
+    buyer_location: str
+    buyer_address: str
+    buyer_contact: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_active: bool
+    is_deleted: bool
+    buyer_metadata: dict = {}
+    user_id: str
+
+class CreateBuyerRequest(BaseModel):
+    buyer_name: str = Field(..., min_length=1, max_length=100)
+    # buyer_email: str = EmailStr
+    buyer_location: str = Field(..., min_length=2, max_length=100)
+    buyer_address: str = Field(..., min_length=2, max_length=200)
+
+    @field_validator('buyer_name')
+    @classmethod
+    def validate_name(cls, v: str):
+        v = v.strip()
+        if not v:
+            raise ValueError('name cannot be empty')
+        return v.title()
+
+    @field_validator('buyer_location')
+    @classmethod
+    def validate_location(cls, v: str):
+        v = v.strip()
+        if not v:
+            raise ValueError('location cannot be empty')
+        return v.title()
+        
+    @field_validator('buyer_address')
+    @classmethod
+    def validate_address(cls, v: str):
+        v = v.strip()
+        if not v:
+            raise ValueError('address cannot be empty')
+        return v.title()
+    
+
+class BuyerResponse(BaseModel):
+    id: str
+    buyer_name: str
+    buyer_email: str
+    buyer_location: str
+    buyer_address: str
+    buyer_contact: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_active: bool
+    is_deleted: bool
+    buyer_metadata: dict = {}
+    user_id: str
+
+class PaginatedBuyerResponse(BaseModel):
+    data: List[Dict[str, Any]]
+    total: int
+    page: int
+    per_page: int
+    has_more: bool
+
+@dataclass
+class BuyerFilter:
+    search: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_deleted: Optional[bool] = None
+    created_at: Optional[str] = None
+    skip: Optional[int] = None
+    take: Optional[int] = None
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def validate_date_format(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            try:
+                datetime.strptime(v, '%d-%m-%y')
+            except ValueError:
+                raise ValueError("Date must be in DD-MM-YYYY format")
+        return v
+    
+    @field_validator('take', mode = "before")
+    @classmethod
+    def validate_take(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v <= 0 or v > 500):
+            raise ValueError("Take must be between 1 and 500")
+        return v
+    
+    model_config = ConfigDict(extra="forbid")

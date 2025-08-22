@@ -1,6 +1,6 @@
 from typing import Literal, Dict, Any, Optional
 
-from services.userService.utils import (
+from services.users.utils import (
     CreateVendorResponse, 
     CreateVendorRequest, 
     FetchVendorResponse,
@@ -8,7 +8,7 @@ from services.userService.utils import (
     UpdateVendorInput,
     VendorResponse,
     )
-from services.userService.vendorService import VendorService
+from services.users.services.vendorService import VendorService
 from deps import auth_dependency
 
 from fastapi import APIRouter, Depends
@@ -156,7 +156,7 @@ def fetch_vendor(
     },
     summary= 'delete vendor'
 )
-def delele_vendor(
+def delete_vendor(
     auth: auth_dependency,
     vendor_id: str,
     delete_status: bool,
