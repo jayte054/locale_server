@@ -51,7 +51,7 @@ def fetch_vendors(
     take: int = 50,
     vendor_service: VendorService = Depends(VendorService)
     ):
-    filter = VendorFilter(
+    vendor_filter = VendorFilter(
         search=search,
         is_active=is_active,
         is_deleted=is_deleted,
@@ -61,7 +61,7 @@ def fetch_vendors(
     )
     return vendor_service.fetch_vendors(
         auth,
-        filter
+        vendor_filter
     )
 
 @router.get(

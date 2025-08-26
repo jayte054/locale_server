@@ -241,3 +241,17 @@ class BuyerFilter:
         return v
     
     model_config = ConfigDict(extra="forbid")
+
+
+class UpdateFilter(BaseModel):
+    buyer_name: Optional[str] = None
+    buyer_email: Optional[str] = None
+    buyer_location: Optional[str] = None
+    buyer_address: Optional[str] = None
+    buyer_contact: Optional[str] = None
+    buyer_metadata: Optional[dict] = {}
+
+
+class ToggleFilter(BaseModel):
+    is_active: Optional[bool] = None
+    is_deleted: Optional[bool] = None

@@ -309,6 +309,8 @@ class VendorService:
             vendor.updated_at = datetime.utcnow()
             self.db.commit()
             self.db.refresh(vendor)
+
+            logger.log('vendor updated successfully')
             return self.map_vendor_response(vendor)
         
         except HTTPException:
