@@ -9,6 +9,8 @@ from services.users.utils import (
     BuyerResponse,
     BuyerFilter,
     PaginatedBuyerResponse,
+    UpdateFilter,
+    ToggleFilter,
 )
 from services.users.model.buyerModel import Buyer
 from services.users.repository.buyerRepository import BuyerRepository
@@ -158,7 +160,7 @@ class BuyerService:
         mapped_buyers = [self.map_to_buyer_response(
             buyer) for buyer in buyers.data]
 
-        logger.log('buyer fetched successfully buy user', auth.get('id') )
+        logger.log('buyer fetched successfully buy user', auth.get('id'))
         return PaginatedBuyerResponse(
             data=mapped_buyers,
             total=buyers.total,
@@ -166,6 +168,231 @@ class BuyerService:
             per_page=buyers.per_page,
             has_more=buyers.has_more
         )
+
+    def update_buyer_by_admin(
+            self,
+            auth: auth_dependency,
+            update_filter: UpdateFilter,
+            buyer_id: str
+    ):
+        if auth.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="unauthorized access"
+            )
+
+        try:
+            updated_buyer = self.buyerRepo.update_buyer(
+                update_filter=update_filter, 
+                buyer_id=buyer_id
+                )
+
+            if not updated_buyer:
+                logger.error('failed to update buyer %s', buyer_id)
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="failed to update buyer"
+                )
+
+            logger.info('buyer updated successfully %s', buyer_id)
+            return self.map_to_buyer_response(updated_buyer)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("failed to update buyer %s: %s",
+                         buyer_id, str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="failed to update buyer"
+            ) from e
+
+    def update_buyer(
+            self,
+            auth: auth_dependency,
+            update_filter: UpdateFilter,
+    ):
+        user_id = auth.get("id")
+        try:
+            updated_buyer = self.buyerRepo.update_buyer(
+                update_filter=update_filter,
+                user_id=user_id
+            )
+
+            if not updated_buyer:
+                logger.error("failed to update buyer %s", user_id)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail='buyer not found'
+                )
+
+            logger.info("buyer updated successfully %s", user_id)
+            return self.map_to_buyer_response(updated_buyer)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("failed to update buyer %s: %s",
+                         user_id, str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="failed to update buyer"
+            ) from e
+
+    def update_buyer_service(
+            self,
+            update_filter: UpdateFilter,
+            buyer_id: Optional[str] = None,
+            user_id: Optional[str] = None,
+    ):
+        target_id: str
+
+        try:
+            if buyer_id:
+                updated_buyer = self.buyerRepo.update_buyer(
+                    update_filter=update_filter, 
+                    buyer_id = buyer_id
+                    )
+                target_id = buyer_id
+            else:
+                updated_buyer = self.buyerRepo.update_buyer(
+                    update_filter=update_filter,
+                    user_id=user_id
+                )
+                target_id = user_id
+            
+            if not updated_buyer:
+                logger.error('buyer not found %s', target_id)
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail='buyer not found'
+                )
+            
+            logger.info("Buyer %s successfully updated", target_id)
+            return self.map_to_buyer_response(updated_buyer)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error('failed to update buyer %s', target_id)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="failed to update buyer"
+            )
+
+
+
+    def toggle_buyer_admin(
+            self,
+            auth: auth_dependency,
+            toggle_filter: ToggleFilter,
+            buyer_id: str
+    ):
+        if auth.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="unauthorized access"
+            )
+        user_id = auth.get("id")
+
+        try:
+            toggled_buyer = self.buyerRepo.toggle_buyer(
+                toggle_filter=toggle_filter,
+                buyer_id=buyer_id
+            )
+
+            if not toggled_buyer:
+                logger.error("buyer not found, buyer: %s", buyer_id)
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=("buyer %s not found", buyer_id)
+                )
+
+            logger.info("buyer %s status successfully toggled by %s", buyer_id, user_id)
+            return self.map_to_buyer_response(toggled_buyer)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("failed to toggle buyer %s by admin %s : %s",
+                         buyer_id, user_id, str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="failed to toggle buyer status"
+            ) from e
+
+    def toggle_buyer(
+            self,
+            auth: auth_dependency,
+            toggle_filter: ToggleFilter
+    ):
+        user_id = auth.get("id")
+
+        try:
+            toggled_buyer = self.buyerRepo.toggle_buyer(
+                toggle_filter=toggle_filter,
+                user_id=user_id
+            )
+
+            if not toggled_buyer:
+                logger.error("failed to toggle buyer %s", user_id)
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="failed to update buyer"
+                )
+
+            logger.info("buyer %s status successfully toggled", user_id)
+            return self.map_to_buyer_response(toggled_buyer)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("failed to toggle buyer %s status: %s",
+                         user_id, str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="failed to toggle buyer status"
+            ) from e
+
+
+    def toggle_buyer_service(
+        self,
+        auth: auth_dependency,
+        toggle_filter: ToggleFilter,
+        buyer_id: Optional[str] = None
+    ):
+        user_id = auth.get("id")
+
+        # Admin can toggle any buyer, regular users can only toggle themselves
+        if buyer_id and auth.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required to toggle other buyers"
+            )
+
+        target_id = buyer_id if buyer_id else user_id
+
+        try:
+            toggled_buyer = self.buyerRepo.toggle_buyer(
+                toggle_filter=toggle_filter,
+                buyer_id=target_id
+            )
+
+            if not toggled_buyer:
+                logger.error("Buyer not found: %s", target_id)
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Buyer not found"
+                )
+
+            logger.info("Buyer %s status toggled by user %s",
+                        target_id, user_id)
+            return self.map_to_buyer_response(toggled_buyer)
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Failed to toggle buyer %s: %s",
+                        target_id, str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to toggle buyer status"
+            ) from e
 
     def map_to_buyer_response(self, buyer: Buyer) -> BuyerResponse:
         return {

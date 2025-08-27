@@ -1,10 +1,23 @@
 from typing import Optional
 
-from services.users.utils import BuyerResponse, CreateBuyerRequest, PaginatedBuyerResponse, BuyerFilter
+from services.users.utils import (
+    BuyerResponse,
+    CreateBuyerRequest,
+    PaginatedBuyerResponse,
+    BuyerFilter,
+    UpdateFilter,
+    ToggleFilter,
+    )
 from services.users.services.buyerService import BuyerService
 from deps import auth_dependency
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import (
+    APIRouter,
+    Depends,
+    Query,
+    Path,
+    Body
+    )
 
 
 router = APIRouter(prefix="/buyer", tags=["Buyer"])
@@ -86,4 +99,100 @@ def fetch_buyers(
     return buyer_service.fetch_buyers(
         auth,
         buyer_filter
+    )
+
+@router.patch(
+    "/update_buyer_admin/:buyer_id",
+    response_model=BuyerResponse,
+    responses={
+        200: {"description": "Buyer updated successfully"},
+        400: {"description": "Invalid input"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Not authorized"}, 
+        404: {"description": "Buyer not found"},
+        500: {"description": "Internal server error"},
+    },
+    summary= "update buyer by admin"
+)
+def update_buyer_admin(
+    auth: auth_dependency,
+    buyer_id: str = Path(..., description='id of the buyer'),
+    update_filter: UpdateFilter = Body(..., description="update data"),
+    buyer_service: BuyerService = Depends(BuyerService)
+):
+    return buyer_service.update_buyer_by_admin(
+        auth,
+        buyer_id=buyer_id,
+        update_filter=update_filter
+    )
+
+@router.patch(
+    "/update_buyer",
+    response_model=BuyerResponse,
+    responses={
+        200: {"description": "Buyer updated successfully"},
+        400: {"description": "Invalid input"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Not authorized"}, 
+        404: {"description": "Buyer not found"},
+        500: {"description": "Internal server error"},
+    },
+    summary= "update buyer"
+)
+def update_buyer(
+    auth: auth_dependency,
+    update_filter: UpdateFilter = Body(..., description = "update data"),
+    buyer_service: BuyerService = Depends(BuyerService)
+):
+    return buyer_service.update_buyer(
+        auth,
+        update_filter=update_filter
+    )
+
+@router.patch(
+    '/toggle_buyer_admin/:buyer_id',
+    response_model=BuyerResponse,
+    responses={
+        200: {"description": "Buyer updated successfully"},
+        400: {"description": "Invalid input"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Not authorized"}, 
+        404: {"description": "Buyer not found"},
+        500: {"description": "Internal server error"},
+    },
+    summary="toggle buyer status by admin"
+)
+def toggle_buyer_admin(
+    auth: auth_dependency,
+    buyer_id: str = Path(..., description="update buyer"),
+    toggle_filter: ToggleFilter = Body(..., description="update data"),
+    buyer_service: BuyerService = Depends(BuyerService)
+):
+    return buyer_service.toggle_buyer_admin(
+        auth,
+        toggle_filter=toggle_filter,
+        buyer_id=buyer_id
+    )
+
+@router.patch(
+    "toggle_buyer",
+    response_model=BuyerResponse,
+    responses={
+        200: {"description": "Buyer updated successfully"},
+        400: {"description": "Invalid input"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Not authorized"}, 
+        404: {"description": "Buyer not found"},
+        500: {"description": "Internal server error"},
+    },
+    summary="toggle buyer status"
+)
+def toggle_buyer(
+    auth: auth_dependency,
+    toggle_filter: ToggleFilter = Body(..., description='filter data'),
+    buyer_service: BuyerService = Depends(BuyerService)
+):
+    return buyer_service.toggle_buyer(
+        auth,
+        toggle_filter,
     )
